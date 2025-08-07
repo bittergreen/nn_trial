@@ -4,17 +4,17 @@ import torch.nn.functional as F
 import math
 
 
-n_layer = 4
-n_head = 8
+n_layer = 6
+n_head = 6
 head_size = 16
-n_embd = 8
-dropout = 0.1
-batch_size = 1
-sequence_length = 128
+n_embd = 16
+dropout = 0.2
+batch_size = 64
+sequence_length = 256
 temperature = 1.0
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 
-context_dim = 128
+context_dim = 8 * 16 * 32  # larger context dim
 
 
 class MultiHeadAttention(nn.Module):
@@ -99,9 +99,10 @@ class CrossMultiHeadAttention(nn.Module):
         self.scale = head_size ** -0.5
 
     def forward(self, x, memory):
+        # x -> (B, T, (hn)), memory -> (B, T, )
         B, T, C = x.shape
-        q = self.query(x)  # (B, T, H)
-        k = self.key(memory)  # (B, W, H)
+        q = self.query(x)
+        k = self.key(memory)
         v = self.value(memory)  # (B, W, H)
         qk = q @ k.transpose(-2, -1) * self.scale  # (B, T, W)
         qk = qk.softmax(dim=-1)
@@ -121,7 +122,7 @@ class ContextMerger(nn.Module):
         projected = self.projection(x)
         # additively merge previous information of the masked tokens into a new (B, T, context_dim)
         merged = torch.cumsum(projected, dim=1)
-        return projected
+        return merged
 
 
 class NeuralMemtable(nn.Module):
@@ -160,7 +161,7 @@ class NeuralMemtable(nn.Module):
 class Hippocampus(nn.Module):
 
     def __init__(self, input_dim: int, context_dim: int):
-        # input_dim: original C in the (B, T, C)
+        # input_dim: original C in the (B, T, (hn))
         super().__init__()
         self.input_dim = input_dim
         self.context_dim = context_dim
@@ -184,7 +185,7 @@ class MiniGPT(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd, device=device)
         self.position_embedding_table = nn.Embedding(sequence_length, n_embd, device=device)
         self.early_blocks = nn.Sequential(*[Block(n_embd, n_head, head_size) for _ in range(n_layer-1)])
-        self.hippo = Hippocampus(n_embd, 4 * n_embd)
+        self.hippo = Hippocampus(n_embd, context_dim)
         self.final_block = Block(n_embd, n_head, head_size, use_cross=True)
         self.ln_f = nn.LayerNorm(n_embd, device=device)
         self.lm_head = nn.Linear(n_embd, vocab_size)

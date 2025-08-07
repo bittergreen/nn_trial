@@ -3,7 +3,7 @@ from core.model import MiniGPT, train_model, device, sequence_length
 from dataset.dataloader import create_dataset
 
 lr = 1e-3
-max_iters = 5000
+max_iters = 1000
 eval_interval = 100
 fine_tune_lr = 1e-3
 fine_tune_max_iters = 500
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     data_path = "dataset/enwik8"
     model_path = "model_saves/model.pth"
     train, test = create_dataset(data_path)
-    train_phase(model_path)
-    # test_phase(model_path)
+    # train_phase(model_path)
+    test_phase(model_path)
     # fine_tune_phase(model_path)
 

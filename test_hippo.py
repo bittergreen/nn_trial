@@ -3,8 +3,9 @@ from dataset.dataloader import create_dataset
 import torch
 
 lr = 1e-3
-max_iters = 10000
+max_iters = 5000
 eval_interval = 100
+
 
 def train_phase(model_path):
     model = MiniGPT(train.vocab_size)
@@ -22,7 +23,7 @@ def test_phase(model_path):
 
 
 if __name__ == "__main__":
-    data_path = "dataset/tiny-shakespeare.txt"
+    data_path = "dataset/enwik8"
     model_path = "model_saves/hippo_model_large_replay.pth"
     train, test = create_dataset(data_path)
     train_phase(model_path)
