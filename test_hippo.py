@@ -2,7 +2,7 @@ from core.model4 import MiniGPT, train_model, device, sequence_length
 from dataset.dataloader import create_dataset
 import torch
 
-lr = 1e-5  # 1e-4 for the first 10000 steps, then 1e-5
+lr = 3e-5  # 1e-4 for the first 10000 steps, then 3e-5
 max_iters = 2000
 eval_interval = 100
 
