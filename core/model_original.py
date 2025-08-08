@@ -8,8 +8,8 @@ n_head = 6
 n_embd = 6 * 32
 head_size = n_embd // n_head
 dropout = 0.0
-batch_size = 64
-sequence_length = 256
+batch_size = 32
+sequence_length = 128
 temperature = 1.0
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 

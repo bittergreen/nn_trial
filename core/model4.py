@@ -9,8 +9,8 @@ n_head = 6
 n_embd = 6 * 32
 head_size = n_embd // n_head
 dropout = 0.0  # Karpathy said it's good for pretraining to set this to 0
-batch_size = 64
-sequence_length = 256
+batch_size = 32
+sequence_length = 128
 temperature = 1.0
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 
@@ -113,24 +113,13 @@ class CrossMultiHeadAttention(nn.Module):
         return out
 
 
-class ContextMerger(nn.Module):
-    def __init__(self, input_dim, context_dim):
-        super().__init__()
-        self.projection = nn.Linear(input_dim, context_dim, device=device)
-
-    def forward(self, x):
-        # x: (B, T, input_dim)
-        projected = self.projection(x)
-        return projected
-
-
 class NeuralMemtable(nn.Module):
 
     """
     This is the hippocampal representation of inner context, 
     to which we can apply cross-attention in late transformer layers
     """
-    def __init__(self, n_embd: int, num: int = 64, temperature: float = 0.5, alpha=0.2):
+    def __init__(self, n_embd: int, num: int = 32, temperature: float = 0.1, alpha=0.2):
         super().__init__()
         self.dim = n_embd
         self.num = num
@@ -166,7 +155,7 @@ class Hippocampus(nn.Module):
         self.context_dim = context_dim
         # Todo: should be combining multiple modalities into a single index
         # Map (B, T, C) to (B, T, context_dim), context_dim larger than C but smaller than T*C
-        self.dentate_gyrus = ContextMerger(input_dim, context_dim)  # generate sparse index
+        self.dentate_gyrus = nn.Linear(input_dim, context_dim, device=device)  # generate sparse index
         self.memtable = NeuralMemtable(context_dim)
         self.out_proj = nn.Linear(context_dim, n_embd, device=device)
     
@@ -184,8 +173,8 @@ class MiniGPT(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd, device=device)
         self.position_embedding_table = nn.Embedding(sequence_length, n_embd, device=device)
         self.early_blocks = nn.Sequential(*[Block(n_embd, n_head, head_size) for _ in range(n_layer-1)])
-        # self.hippo = Hippocampus(n_embd, context_dim)
-        self.final_block = Block(n_embd, n_head, head_size, use_cross=False)
+        self.hippo = Hippocampus(n_embd, context_dim)
+        self.final_block = Block(n_embd, n_head, head_size, use_cross=True)
         self.ln_f = nn.LayerNorm(n_embd, device=device)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
@@ -195,8 +184,8 @@ class MiniGPT(nn.Module):
         pos_emb = self.position_embedding_table(torch.arange(T, device=device))
         x = emb + pos_emb
         x = self.early_blocks(x)
-        # past_context = self.hippo(x)
-        x = self.final_block(x)
+        past_context = self.hippo(x)
+        x = self.final_block(x, past_context)
         x = self.ln_f(x)
         logits = self.lm_head(x)
         if targets is None:
@@ -211,7 +200,7 @@ class MiniGPT(nn.Module):
     def generate(self, idx, max_new_tokens, switch=None, cue=None):
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -sequence_length:]
-            logits, _, _ = self(idx_cond, switch=switch, cue=cue)
+            logits, _ = self(idx_cond, switch=switch, cue=cue)
             logits = logits[:, -1, :] / temperature
             probs = torch.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
