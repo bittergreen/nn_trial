@@ -6,15 +6,15 @@ import math
 
 n_layer = 6
 n_head = 6
-head_size = 16
-n_embd = 16
+n_embd = 6 * 32
+head_size = n_embd // n_head
 dropout = 0.2
 batch_size = 64
 sequence_length = 256
 temperature = 1.0
 device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
 
-context_dim = 8 * 16 * 32  # larger context dim
+context_dim = n_embd * 4  # larger context dim
 
 
 class MultiHeadAttention(nn.Module):
@@ -87,6 +87,7 @@ class Block(nn.Module):
 
 
 class CrossMultiHeadAttention(nn.Module):
+
     def __init__(self, num_heads: int, head_size: int):
         super().__init__()
         self.num_heads = num_heads
@@ -96,7 +97,7 @@ class CrossMultiHeadAttention(nn.Module):
         self.value = nn.Linear(n_embd, head_size * num_heads, device=device)
         self.output = nn.Linear(head_size * num_heads, n_embd, device=device)
         self.dropout = nn.Dropout(dropout)
-        self.scale = head_size ** -0.5
+        self.scale = head_size ** 0.5
 
     def forward(self, x, memory):
         # x -> (B, T, (hn)), memory -> (B, T, )
@@ -120,9 +121,7 @@ class ContextMerger(nn.Module):
     def forward(self, x):
         # x: (B, T, input_dim)
         projected = self.projection(x)
-        # additively merge previous information of the masked tokens into a new (B, T, context_dim)
-        merged = torch.cumsum(projected, dim=1)
-        return merged
+        return projected
 
 
 class NeuralMemtable(nn.Module):
@@ -131,7 +130,7 @@ class NeuralMemtable(nn.Module):
     This is the hippocampal representation of inner context, 
     to which we can apply cross-attention in late transformer layers
     """
-    def __init__(self, n_embd: int, num: int = 8, temperature: float = 0.1, alpha=0.2):
+    def __init__(self, n_embd: int, num: int = 64, temperature: float = 0.5, alpha=0.2):
         super().__init__()
         self.dim = n_embd
         self.num = num

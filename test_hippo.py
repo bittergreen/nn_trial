@@ -23,8 +23,8 @@ def test_phase(model_path):
 
 
 if __name__ == "__main__":
-    data_path = "dataset/enwik8"
-    model_path = "model_saves/hippo_model_large_replay.pth"
+    data_path = "dataset/tiny-shakespeare.txt"
+    model_path = "model_saves/hippo_model.pth"
     train, test = create_dataset(data_path)
     train_phase(model_path)
     # test_phase(model_path)
