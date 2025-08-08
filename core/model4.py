@@ -8,7 +8,7 @@ n_layer = 6
 n_head = 6
 n_embd = 6 * 32
 head_size = n_embd // n_head
-dropout = 0.2
+dropout = 0.0  # Karpathy said it's good for pretraining to set this to 0
 batch_size = 64
 sequence_length = 256
 temperature = 1.0
@@ -184,8 +184,8 @@ class MiniGPT(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd, device=device)
         self.position_embedding_table = nn.Embedding(sequence_length, n_embd, device=device)
         self.early_blocks = nn.Sequential(*[Block(n_embd, n_head, head_size) for _ in range(n_layer-1)])
-        self.hippo = Hippocampus(n_embd, context_dim)
-        self.final_block = Block(n_embd, n_head, head_size, use_cross=True)
+        # self.hippo = Hippocampus(n_embd, context_dim)
+        self.final_block = Block(n_embd, n_head, head_size, use_cross=False)
         self.ln_f = nn.LayerNorm(n_embd, device=device)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
@@ -195,8 +195,8 @@ class MiniGPT(nn.Module):
         pos_emb = self.position_embedding_table(torch.arange(T, device=device))
         x = emb + pos_emb
         x = self.early_blocks(x)
-        past_context = self.hippo(x)
-        x = self.final_block(x, past_context)
+        # past_context = self.hippo(x)
+        x = self.final_block(x)
         x = self.ln_f(x)
         logits = self.lm_head(x)
         if targets is None:
